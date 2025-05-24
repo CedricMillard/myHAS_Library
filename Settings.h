@@ -21,6 +21,7 @@ class Settings
 {
 public:
   Settings();
+  void setName(String iName);
   void setWifiList(String iList);
   void setWifiLogin(String iSSID, String iPwd);
   void setmqttServer(String iServer, int iPort, String iLogin, String iPwd);
@@ -48,6 +49,7 @@ private:
   int mqttPort = 0;
   //List of available wifi networks, separated by ';'
   String listWIFInets = "";
+  String sName="";
   char *strWifiSSID = NULL;
   char *strWifiPWD = NULL;
   char *strMqttServer = NULL;
@@ -63,7 +65,7 @@ const char Settings_html[] PROGMEM = R"html(
 <link rel="stylesheet" type="text/css" href="http://cedric.millard.free.fr/MyHAS.css">
 </head>
 <body>
-<h1>Settings</h1>
+<h1>Settings for #NAME#</h1>
 <form id="FormR" action="/updateSettings" method="post">
 <label for="wifiSSID">Wifi Network:</label> 
 <select id="wifiSSID" name="wifiSSID">

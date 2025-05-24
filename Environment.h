@@ -64,7 +64,7 @@ class Environment : public MyMQTTClient
     float TemperatureExt = 100;
     float weatherLat = 59.449062;
     float weatherLong = 16.332060;
-    Weather weather_d[4];
+    Weather weather_d[5];
     Weather weather_h[24];
     Array<float> sensorValues;
     Array<String> sensorUnits;
