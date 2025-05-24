@@ -160,7 +160,7 @@ void Environment::setWeatherDaily(String iWeatherJson)
 
   JsonArray daily = doc["daily"];
 
-  for(int i=0; i<4; i++)
+  for(int i=0; i<5; i++)
   {
     JsonObject currentDay = daily[i];
     weather_d[i].Weather = (short) currentDay["weather"];
@@ -217,22 +217,26 @@ Weather Environment::getTomorrowWeather()
 Weather Environment::getWeatherDay(int day)
 {
   Weather emptyWeather;
-  if (day>=4 || weather_d[0].updateTime == 0)
-  {
+  if (day>3 || weather_d[0].updateTime == 0)
     return emptyWeather;
-  }
 
   struct tm updatedDay = *localtime(&(weather_d[0].updateTime));
+  //Reset hour to midnight
   updatedDay.tm_hour = 0; updatedDay.tm_min = 0; updatedDay.tm_sec = 0;
 
-  long delta = difftime(time(nullptr), mktime(&updatedDay));
+  /*long delta = difftime(time(nullptr), mktime(&updatedDay));
 
   //Weather updated today
   if (delta < 86400) return weather_d[day];
   //Weather was updated yesterday
   if (delta < 172800 && day<3) return weather_d[day+1];
   if (delta < 259200 && day<2) return weather_d[day+2];
-  if (delta < 345600 && day<1) return weather_d[day+3];
+  if (delta < 345600 && day<1) return weather_d[day+3];*/
+
+  int delta = difftime(time(nullptr), mktime(&updatedDay))/86400;
+
+  if (delta+day<5) return weather_d[delta+day];
+
   return emptyWeather;
 }
 

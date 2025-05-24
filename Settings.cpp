@@ -18,6 +18,11 @@ Settings::Settings()
     readSettingsFile();
 }
   
+void Settings::setName(String iName)
+{
+    sName = iName;
+}
+
 void Settings::setWifiLogin(String iSSID, String iPwd)
 {
     if(strWifiSSID) free(strWifiSSID);
@@ -202,6 +207,7 @@ String Settings::getSettingsHtml()
     }
 
     //Generate the full HTML
+    webPage.replace("#NAME#",sName);
     webPage.replace("#OPTION_SSID#",wifiOptions);
     webPage.replace("#WIFI_PWD#",strWifiPWD);
     webPage.replace("#MQTT_SERVER#",strMqttServer);
