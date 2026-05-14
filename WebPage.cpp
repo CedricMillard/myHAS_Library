@@ -106,22 +106,41 @@ String WebPage::getIndexHTML()
 
 String WebPage::getIndexHTML_file()
 {
+#ifdef _DEBUG_
+  Serial.println("WebPage::getIndexHTML_file()");
+#endif
+
 #ifdef ESP8266
   bool result = SPIFFS.begin();
 #else
   bool result = SPIFFS.begin(true);
 #endif
 
-  if(!result) return "";
+  if(!result) 
+{
+#ifdef _DEBUG_
+    Serial.println("WebPage::getIndexHTML_file():Cannot start SPIFFS");
+#endif
+    return "";
+}
 
   File htmlFile = SPIFFS.open(INDEX_FILE_PATH, "w");
   
+#ifdef _DEBUG_
+    Serial.println(String("WebPage::getIndexHTML_file():File is opened path ")+String(INDEX_FILE_PATH));
+#endif
+
   String htmlPage = FPSTR(checkbox_style);
   htmlPage +=FPSTR(index_html);
   htmlPage.replace("#TITLE#", sTitle);
   htmlPage.replace("#TIME#", getTimeFr());
   htmlPage.replace("#DATE#", getDateFr());
   htmlFile.println(htmlPage);
+  
+#ifdef _DEBUG_
+    Serial.println("WebPage::getIndexHTML_file():Header written in file");
+#endif  
+  
   for(int i = 0; i<aPrises.size();i++)
   {
     String Prise = FPSTR(index_html_switch);
@@ -137,6 +156,10 @@ String WebPage::getIndexHTML_file()
     htmlFile.println(Prise);
   }
   
+#ifdef _DEBUG_
+    Serial.println("WebPage::getIndexHTML_file():Prises written in file");
+#endif  
+
   if(aSensors.size())
     htmlFile.println("<hr>");
 
@@ -160,6 +183,10 @@ String WebPage::getIndexHTML_file()
     }
     htmlFile.println(Sensor);
   }
+
+#ifdef _DEBUG_
+    Serial.println("WebPage::getIndexHTML_file():Sensors written in file");
+#endif  
 
   if(aDisplays.size())
     htmlFile.println("<hr>");
@@ -206,12 +233,28 @@ String WebPage::getIndexHTML_file()
 
     htmlFile.println(sWeatherDisp);
   }
-  
-  htmlFile.println("<hr>");
-  htmlFile.println(pLog->getLogHTML());
-  htmlFile.println(FPSTR(index_html_footer));
-  htmlFile.close();
+#ifdef _DEBUG_
+    Serial.println("WebPage::getIndexHTML_file():Displays written in file");
+#endif  
 
+  htmlFile.println("<hr>");
+  if(pLog)
+    htmlFile.println(pLog->getLogHTML());
+  else
+    htmlFile.println("<br>Logs not set<br>");
+#ifdef _DEBUG_
+    Serial.println("WebPage::getIndexHTML_file():Logs written in file");
+#endif
+  htmlFile.println(FPSTR(index_html_footer));
+
+#ifdef _DEBUG_
+    Serial.println("WebPage::getIndexHTML_file(): footer written in file");
+#endif  
+
+  htmlFile.close();
+#ifdef _DEBUG_
+  Serial.println("WebPage::getIndexHTML_file():File closed");
+#endif
   return INDEX_FILE_PATH;
 }
 

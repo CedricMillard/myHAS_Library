@@ -22,6 +22,7 @@ struct Weather
   float Tmin = -255;
   float T6 = -255;
   short Weather = 0;
+  short Icon = 0;
   float Wind = -255;
 //  float Moon = -255;
   time_t updateTime = 0;
@@ -52,6 +53,7 @@ class Environment : public MyMQTTClient
     void handleMqttCallback(char* iTopic, byte* payload, unsigned int iLength);
     time_t getSunsetTime();
     time_t getSunriseTime();
+    bool isDay(); // Return true if the sun is visible
     void setLog(Logging *iLog){pLog = iLog;}
     void setLocation(float iLat, float iLong);
     bool isSunriseSunsetUptodate();
@@ -69,8 +71,8 @@ class Environment : public MyMQTTClient
     Array<float> sensorValues;
     Array<String> sensorUnits;
     Logging *pLog = NULL;
-    unsigned long sunsetTime = 0;
-    unsigned long sunriseTime = 0;
+    time_t sunsetTime = 0;
+    time_t sunriseTime = 0;
     
 };
 
