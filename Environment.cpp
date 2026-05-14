@@ -12,6 +12,7 @@
 #define ARDUINOJSON_USE_LONG_LONG 1
 #include <ArduinoJson.h>
 #include <Arduino.h>
+//#define _DEBUG_
 
 Environment::Environment(PubSubClient *iMqttClientEnv, short iId) : MyMQTTClient(iMqttClientEnv, String(iId) + "_Env")
 {
@@ -100,11 +101,10 @@ bool Environment::setRealTime()
   configTime(TZ_Europe_Amsterdam, NTP_SERVER_1, NTP_SERVER_2, NTP_SERVER_3);
 #else
   configTime(3600, 3600, NTP_SERVER_1, NTP_SERVER_2, NTP_SERVER_3);
-  setenv("TZ", "CET-1CEST-2,M3.5.0/02:00:00,M10.5.0/03:00:00", 1);
+  //setenv("TZ", "CET-1CEST-2,M3.5.0/02:00:00,M10.5.0/03:00:00", 1);
+  setenv("TZ", "JST-9", 1);
   tzset();
 #endif
-
-  
 
   struct tm timeinfo;
   if(!getLocalTime(&timeinfo,5000U)){
@@ -153,6 +153,10 @@ void Environment::setSensorValue(int iSensorId, float iValue)
 
 void Environment::setWeatherDaily(String iWeatherJson)
 {
+#ifdef _DEBUG_
+  Serial.println("Environment::setWeatherDaily");
+  Serial.println(iWeatherJson);
+#endif
   DynamicJsonDocument doc(1024);
   DeserializationError err = deserializeJson(doc, iWeatherJson);
   if(err!=DeserializationError::Ok)
@@ -164,16 +168,24 @@ void Environment::setWeatherDaily(String iWeatherJson)
   {
     JsonObject currentDay = daily[i];
     weather_d[i].Weather = (short) currentDay["weather"];
+    weather_d[i].Icon = (short) currentDay["icon"];
     weather_d[i].Tmax = (float)currentDay["Tmax"];
     weather_d[i].Tmin = (float)currentDay["Tmin"];
     weather_d[i].Wind = (float)currentDay["wind"];
     weather_d[i].T6 = (float)currentDay["T6"];
     weather_d[i].updateTime = (long)currentDay["time"];
   }
+#ifdef _DEBUG_
+  Serial.println("Environment::setWeatherDaily done");
+#endif
 }
 
 void Environment::setWeatherHourly(String iWeatherJson)
 {
+#ifdef _DEBUG_
+  Serial.println("Environment::setWeatherHourly");
+  Serial.println(iWeatherJson);
+#endif  
   DynamicJsonDocument doc(4096);
   DeserializationError err = deserializeJson(doc, iWeatherJson);
   if(err!=DeserializationError::Ok)
@@ -185,10 +197,14 @@ void Environment::setWeatherHourly(String iWeatherJson)
   {
     JsonObject currentHour = hourly[i];
     weather_h[i].Weather = (short) currentHour["weather"];
+    weather_h[i].Icon = (short) currentHour["icon"];
     weather_h[i].Tmax = weather_h[i].Tmin = (float)currentHour["Temp"];
     weather_h[i].Wind = (float)currentHour["wind"];
     weather_h[i].updateTime = (long)currentHour["time"];
   }
+#ifdef _DEBUG_
+  Serial.println("Environment::setWeatherHourly done");
+#endif
 }
 
 String Environment::getSensorUnit(int iSensorId)
@@ -258,49 +274,86 @@ Weather Environment::getWeatherHour(long hour)
 
 bool Environment::isSunriseSunsetUptodate()
 {
-  //Time in UTC
+  //compare current day in local time with sunrise and sunset day
   time_t t = time (nullptr);
-  tm * srTM_midnight = localtime(&t);
-  srTM_midnight->tm_hour = 0;
-  srTM_midnight->tm_min = 0;
-  srTM_midnight->tm_sec = 0;
-
-  time_t t_midnight = mktime(srTM_midnight);
-  return difftime(getSunriseTime(), t_midnight) > 0;
+  tm srTM_now = *localtime(&t);
+  tm srTM_sunrise = *localtime(&(sunriseTime));
+  tm srTM_sunset = *localtime(&(sunsetTime));  
+ 
+  return (sunriseTime>0 && srTM_sunrise.tm_yday == srTM_now.tm_yday && srTM_sunset.tm_yday == srTM_now.tm_yday);
 }
 
 void Environment::updateSunriseSunsetTime(bool iForce)
 {
-  //Time in UTC
-  time_t t = time (nullptr);
-  
   if(!isSunriseSunsetUptodate() || iForce)
   {
+#ifdef _DEBUG_    
+    Serial.println("updateSunriseSunsetTime");
+#endif
     pLog->addLogEntry("Update Sunrise and Sunset time");
-    tm * srTM = localtime(&t);
     
-    //Calculate local epoch time
-  #if defined(ESP8266)
-    time_t gmtT = mktime(gmtime(&t));
-    if(srTM->tm_isdst) gmtT-=3600;
-    time_t t2 = t + t - gmtT;
-  #else
-    setenv("TZ", "GMT0",1);
-    time_t t2 = mktime(srTM);
-    setenv("TZ", "CET-1CEST-2,M3.5.0/02:00:00,M10.5.0/03:00:00", 1);
-  #endif
+    //Time in UTC
+    time_t t = time (nullptr);
     
-    //local epoch time at midnight
-    time_t t0 = t2 / (24*3600);
-    
-    //local epoch time at noon
-    t2 = t2 - t2%(24*3600) + 12*3600;
+    SunRise sr_tday;
+    sr_tday.calculate(weatherLat, weatherLong, t);
 
-    SunRise sr;
-    sr.calculate(weatherLat, weatherLong, t2);
-    sunsetTime = sr.setTime;
-    sunriseTime = sr.riseTime;
+    SunRise sr_tmrw;
+    sr_tmrw.calculate(weatherLat, weatherLong, t+86400);
+
+    SunRise sr_ystd;
+    sr_ystd.calculate(weatherLat, weatherLong, t-86400);
+
+    //Get day of the year for the three times
+    tm srTM_now = *localtime(&t);
+    time_t riseTime = sr_tday.riseTime;
+    time_t setTime = sr_tday.setTime;
+    tm srTM_sunrise = *localtime(&riseTime);
+    tm srTM_sunset = *localtime(&setTime);
+
+    //In case sunrise is not same day, use a different date
+    if(srTM_sunrise.tm_yday == srTM_now.tm_yday)
+    {
+      sunriseTime = sr_tday.riseTime;
+    }
+    else if(srTM_sunrise.tm_yday < srTM_now.tm_yday || srTM_sunrise.tm_year < srTM_now.tm_year)
+    {
+      sunriseTime = sr_tmrw.riseTime;
+    }
+    else
+    {
+      sunriseTime = sr_ystd.riseTime;
+    }
+
+    if(srTM_sunset.tm_yday == srTM_now.tm_yday)
+    {
+      sunsetTime = sr_tday.setTime;
+    }
+    else if(srTM_sunset.tm_yday < srTM_now.tm_yday || srTM_sunset.tm_year < srTM_now.tm_year)
+    {
+      sunsetTime = sr_tmrw.setTime;
+    }
+    else
+    {
+      sunsetTime = sr_ystd.setTime;
+    }
+
+#ifdef _DEBUG_    
+    Serial.println(String("Sunset time = ")+String(sunsetTime));
+    Serial.println(String("Sunrise time = ")+String(sunriseTime));
+#endif
   }
+}
+
+bool Environment::isDay()
+{
+  //Time in UTC
+  /*time_t t = time (nullptr);
+  SunRise sr;
+  sr.calculate(weatherLat, weatherLong, t);
+  return sr.isVisible;*/
+  time_t t = time (nullptr);
+  return (t<sunsetTime && t>=sunriseTime);
 }
 
 time_t Environment::getSunsetTime()
@@ -331,7 +384,7 @@ String getWeekNumber()
 
 String getTimeFr()
 {
-  String out;
+  String out= "";
   struct tm timeinfo;
   char sTime[10];
    if(!getLocalTime(&timeinfo,5000U)){
@@ -362,7 +415,7 @@ long getTimeSec()
 
 String getDateFr()
 {
-  String out;
+  String out = "";
   struct tm timeinfo;
   char sTime[20];
    if(!getLocalTime(&timeinfo,5000U)){
@@ -378,7 +431,7 @@ String getDateFr()
 
 String getDateShort()
 {
-  String out;
+  String out = "";
   struct tm timeinfo;
   char sTime[6];
    if(!getLocalTime(&timeinfo,5000U)){
@@ -428,6 +481,7 @@ bool operator==(const Weather& lhs, const Weather& rhs)
     if(lhs.T6!=rhs.T6) return false;
     if(lhs.Weather!=rhs.Weather) return false;
     if(lhs.Wind!=rhs.Wind) return false;
+    if(lhs.Icon!=rhs.Icon) return false;
     //if(lhs.Moon!=rhs.Moon) return false;
 
     return true;

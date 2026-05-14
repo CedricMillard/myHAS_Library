@@ -9,13 +9,30 @@
 
 Settings::Settings()
 {
+Serial.println("Init Settings: starting SPIFFS");
 #ifdef ESP8266
-  bool result = SPIFFS.begin();
+Serial.println("SPIFFS for ESP8266");  
+bool result = SPIFFS.begin();
+Serial.println("SPIFFS started");    
 #else
-  bool result = SPIFFS.begin(true);
+  //bool result = SPIFFS.begin(true);
+  /*if (!LittleFS.begin(FORMAT_LITTLEFS_IF_FAILED)) {
+    Serial.println("LittleFS Mount Failed");
+    return;
+  }*/
+  
+  
+  if (!SPIFFS.begin(true)) {
+        Serial.println("SPIFFS Mount Failed");
+        return;
+  }
+  Serial.println("SPIFFS started");    
 #endif
     //SPIFFS.remove(Settings_FILE_PATH);
     readSettingsFile();
+
+    SPIFFS.end();
+
 }
   
 void Settings::setName(String iName)
@@ -78,9 +95,16 @@ bool Settings::saveSettings()
 
     serializeJson(doc, SettingsJson);
 
+    if (!SPIFFS.begin(true)) {
+        Serial.println("SPIFFS Mount Failed");
+        return false;
+    }
+
     File SettingsFile = SPIFFS.open(Settings_FILE_PATH, "w");
     SettingsFile.println(SettingsJson);
     SettingsFile.close();
+
+    SPIFFS.end();
     return true;
 }
 
@@ -139,6 +163,7 @@ const char* Settings::getOTAPWD()
   
 void Settings::readSettingsFile()
 {
+    Serial.println("Try to read Settings");
     String SettingsJson="";
     File SettingsFile = SPIFFS.open(Settings_FILE_PATH, "r");
     while(SettingsFile.available() && SettingsJson.length()==0) 
@@ -147,7 +172,11 @@ void Settings::readSettingsFile()
     }
     SettingsFile.close();
 
-    if(SettingsJson.length()==0) return;
+    if(SettingsJson.length()==0) 
+    {
+        Serial.println("No Settings found");
+        return;
+    }
 
     StaticJsonDocument<384> doc;
     DeserializationError error = deserializeJson(doc, SettingsJson);
